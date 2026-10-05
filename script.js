@@ -9,11 +9,11 @@
 const CONFIG = {
   // ID o enlace completo del Google Sheets (el archivo debe estar compartido
   // como "Cualquier persona con el enlace · Lector").
-  SHEET_ID: 'https://docs.google.com/spreadsheets/d/1SCd4fU49LOGk67wbW_CGsJ3MBfGxjm8_/edit?usp=sharing&ouid=101201834709522408470&rtpof=true&sd=true',
+  SHEET_ID: '',
 
   // Número de WhatsApp: código de país + número, solo dígitos (57 = Colombia).
   // ESTE ES EL ÚNICO LUGAR DONDE SE DEFINE.
-  WHATSAPP: '+57 321 8618340',
+  WHATSAPP: '573000000000',
 
   MENSAJE_GENERAL: 'Hola, quiero más información sobre el catálogo.',
   // {producto} se reemplaza por el nombre del producto.
@@ -167,7 +167,10 @@ async function loadData() {
   // Varias filas con el mismo Nombre (y Categoría) son UN producto en varios colores:
   // cada fila aporta su color y sus propias fotos.
   const groups = new Map();
-  prod.value.rows.filter((r) => r.nombre).forEach((r) => {
+  // Columna "Publicar": si existe, solo salen las filas que digan "ok".
+  const usaPublicar = prod.value.headers.includes('publicar');
+  const publicada = (r) => !usaPublicar || ['ok', 'si', 'x', 'true', 'verdadero'].includes(norm(r.publicar));
+  prod.value.rows.filter((r) => r.nombre && publicada(r)).forEach((r) => {
     const k = `${norm(r.nombre)}|${norm(r.categoria)}`;
     let p = groups.get(k);
     if (!p) { p = { nombre: r.nombre, categoria: r.categoria || '', material: '', tallas: [], colores: [], variantes: [] }; groups.set(k, p); }
