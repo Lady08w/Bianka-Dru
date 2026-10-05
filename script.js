@@ -9,7 +9,7 @@
 const CONFIG = {
   // ID o enlace completo del Google Sheets (el archivo debe estar compartido
   // como "Cualquier persona con el enlace · Lector").
-  SHEET_ID: '',
+  SHEET_ID: 'https://docs.google.com/spreadsheets/d/1SCd4fU49LOGk67wbW_CGsJ3MBfGxjm8_/edit?usp=sharing&ouid=101201834709522408470&rtpof=true&sd=true',
 
   // Número de WhatsApp: código de país + número, solo dígitos (57 = Colombia).
   // ESTE ES EL ÚNICO LUGAR DONDE SE DEFINE.
