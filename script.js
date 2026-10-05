@@ -1,238 +1,500 @@
 /* ==========================================================================
-   CATÁLOGO DIGITAL — estilos
-   Paleta: fondo blanco, texto casi negro, bordes gris claro, interacción #EFE4C7
+   CATÁLOGO DIGITAL — lógica
+   Google Sheets  →  datos  →  este archivo  →  página
    ========================================================================== */
 
-:root {
-  --bg: #ffffff;
-  --ink: #141414;
-  --muted: #6e6e6e;
-  --line: #ebebeb;
-  --accent: #efe4c7;
-  --ph: #f5f4f1;
-  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-  --body: "Inter", "Helvetica Neue", Arial, sans-serif;
-  --gutter: clamp(16px, 4vw, 48px);
+/* --------------------------------------------------------------------------
+   CONFIGURACIÓN — lo único que se toca en el código, y solo una vez.
+   -------------------------------------------------------------------------- */
+const CONFIG = {
+  // ID o enlace completo del Google Sheets (el archivo debe estar compartido
+  // como "Cualquier persona con el enlace · Lector").
+  SHEET_ID: '',
+
+  // Número de WhatsApp: código de país + número, solo dígitos (57 = Colombia).
+  // ESTE ES EL ÚNICO LUGAR DONDE SE DEFINE.
+  WHATSAPP: '573000000000',
+
+  MENSAJE_GENERAL: 'Hola, quiero más información sobre el catálogo.',
+  // {producto} se reemplaza por el nombre del producto.
+  MENSAJE_PRODUCTO: 'Hola, estoy interesado en: {producto}. ¿Me pueden dar más información?',
+  // Se usa cuando el cliente eligió un color. {color} se reemplaza por el color elegido.
+  MENSAJE_PRODUCTO_COLOR: 'Hola, estoy interesado en: {producto}, color {color}. ¿Me pueden dar más información?',
+
+  // Nombres de las pestañas del Google Sheets.
+  HOJAS: { productos: 'Productos', categorias: 'Categorias', banner: 'Banner' },
+
+  TEXTO_TODOS: 'Todos',
+};
+
+/* -------------------------------------------------------------------------- */
+
+const $ = (s) => document.querySelector(s);
+const state = { products: [], categories: [], cat: null, query: '' };
+
+const WA_PATH = 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1.1 2.7.1.2 1.9 2.9 4.6 4 1.700.7 2.3.7 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z';
+
+/* ---------- Utilidades ---------- */
+
+// Quita tildes, mayúsculas y espacios extra: "Categoría " → "categoria"
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const key = (s) => norm(s).replace(/[^a-z0-9]/g, '');
+const list = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+const isTrue = (s) => ['true', 'verdadero', 'si', 'yes', '1', 'x'].includes(norm(s));
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') node.className = v;
+    else if (k === 'text') node.textContent = v;
+    else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of children.flat()) if (c) node.append(c);
+  return node;
 }
 
-*, *::before, *::after { box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-html.lock { overflow: hidden; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font: 400 15px/1.5 var(--body);
-  -webkit-font-smoothing: antialiased;
+function svg(pathD, cls, stroke) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const s = document.createElementNS(ns, 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('aria-hidden', 'true');
+  if (cls) s.setAttribute('class', cls);
+  const p = document.createElementNS(ns, 'path');
+  p.setAttribute('d', pathD);
+  if (stroke) { p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '1.6'); p.setAttribute('stroke-linecap', 'round'); }
+  s.append(p);
+  return s;
 }
-img { display: block; max-width: 100%; }
-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
-a { color: inherit; text-decoration: none; }
-h1, h2, h3, p, dl, dd { margin: 0; }
-[hidden] { display: none !important; }
-:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.wrap { width: 100%; max-width: 1440px; margin-inline: auto; padding-inline: var(--gutter); }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: #fff; padding: 10px 14px; z-index: 100; }
-.skip:focus { left: 8px; }
-
-/* ---------- Botones ---------- */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 44px; padding: 0 20px;
-  font: 600 12px/1 var(--display); letter-spacing: .12em; text-transform: uppercase;
-  background: var(--ink); color: #fff; border: 1px solid var(--ink);
-  transition: background .2s, color .2s, border-color .2s;
+function waLink(product, color) {
+  let msg = CONFIG.MENSAJE_GENERAL;
+  if (product && color) msg = CONFIG.MENSAJE_PRODUCTO_COLOR.replace('{producto}', product).replace('{color}', color);
+  else if (product) msg = CONFIG.MENSAJE_PRODUCTO.replace('{producto}', product);
+  return `https://wa.me/${String(CONFIG.WHATSAPP).replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
 }
-.btn:hover, .btn:active { background: var(--accent); border-color: var(--accent); color: var(--ink); }
-.btn-outline { background: transparent; color: var(--ink); border-color: var(--line); }
-.btn-light { background: #fff; border-color: #fff; color: var(--ink); }
-.btn svg.wa, .fab svg.wa { width: 18px; height: 18px; fill: currentColor; flex: none; }
-.icon-btn { width: 44px; height: 44px; display: inline-grid; place-items: center; transition: background .2s; }
-.icon-btn:hover, .icon-btn:active { background: var(--accent); }
-.icon-btn svg, .search svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
 
-/* ---------- Header ---------- */
-.header { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
-.header-top { display: grid; grid-template-columns: 1fr minmax(0, 380px) 1fr; align-items: center; gap: 16px; min-height: 72px; }
-.logo { display: inline-flex; align-items: center; gap: 12px; white-space: nowrap; font: 700 20px/1 var(--display); letter-spacing: .18em; text-transform: uppercase; justify-self: start; }
-.logo img { width: 44px; height: 44px; object-fit: cover; flex: none; }
-.header-actions { display: flex; align-items: center; gap: 4px; justify-self: end; }
-.search-toggle { display: none; }
-
-.search { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border: 1px solid var(--line); transition: border-color .2s, background .2s; }
-.search:focus-within { border-color: var(--ink); }
-.search svg { color: var(--muted); flex: none; }
-.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font: inherit; font-size: 16px; color: var(--ink); }
-.search input::placeholder { color: #9a9a9a; font-size: 14px; }
-
-.cats { border-top: 1px solid var(--line); }
-.cats-scroll { display: flex; gap: 4px; overflow-x: auto; padding: 8px var(--gutter); scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.cats-scroll::-webkit-scrollbar { display: none; }
-.cats-scroll > :first-child { margin-left: auto; }
-.cats-scroll > :last-child { margin-right: auto; }
-.cat {
-  flex: none; min-height: 40px; padding: 0 16px;
-  font: 500 12px/1 var(--display); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
-  color: var(--muted); transition: background .2s, color .2s;
+function waButton(product, extraClass = '') {
+  return el('a', { class: `btn ${extraClass}`, href: waLink(product), target: '_blank', rel: 'noopener', 'aria-label': `Pedir información de ${product} por WhatsApp` },
+    svg(WA_PATH, 'wa'), el('span', { text: 'WhatsApp' }));
 }
-.cat:hover, .cat:active { background: var(--accent); color: var(--ink); }
-.cat[aria-pressed="true"] { background: var(--accent); color: var(--ink); font-weight: 600; }
+
+// Solo deja pasar enlaces seguros (evita "javascript:" en la hoja Banner)
+const safeUrl = (u) => (/^(https?:\/\/|#|\/|mailto:|tel:)/i.test(u.trim()) ? u.trim() : null);
+
+/* ---------- Imágenes de Google Drive ---------- */
+
+// Acepta el enlace "Copiar vínculo" de Drive, un ID suelto o cualquier URL directa de imagen.
+function driveId(raw) {
+  const u = String(raw).trim();
+  if (/^[\w-]{25,}$/.test(u)) return u;
+  if (!/(drive|docs)\.google\.com|googleusercontent\.com/.test(u)) return null;
+  const m = u.match(/\/d\/([\w-]{20,})/) || u.match(/[?&]id=([\w-]{20,})/);
+  return m ? m[1] : null;
+}
+
+function imageSources(raw, width) {
+  const id = driveId(raw);
+  if (!id) return [String(raw).trim()];
+  return [
+    `https://lh3.googleusercontent.com/d/${id}=w${width}`,
+    `https://drive.google.com/thumbnail?id=${id}&sz=w${width}`,
+  ];
+}
+
+// Crea un <img> con lazy loading y respaldo; si nada carga, se elimina y avisa.
+function makeImg(raw, alt, width, onFail, eager) {
+  const sources = imageSources(raw, width);
+  let i = 0;
+  const img = el('img', { alt, loading: eager ? 'eager' : 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+  img.addEventListener('load', () => img.classList.add('is-loaded'));
+  img.addEventListener('error', () => {
+    i += 1;
+    if (i < sources.length) img.src = sources[i];
+    else { img.remove(); if (onFail) onFail(); }
+  });
+  img.src = sources[0];
+  return img;
+}
+
+/* ---------- Lectura de Google Sheets ---------- */
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = '', quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ',') { row.push(cell); cell = ''; }
+    else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (c !== '\r') cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function sheetId() {
+  const raw = String(CONFIG.SHEET_ID).trim();
+  const m = raw.match(/\/d\/([\w-]+)/);
+  return m ? m[1] : raw;
+}
+
+// Devuelve { headers: [...], rows: [{columna: valor}] } con los encabezados normalizados.
+async function fetchSheet(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId()}/gviz/tq?tqx=out:csv&headers=1&sheet=${encodeURIComponent(name)}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  if (text.trim().startsWith('<')) throw new Error('La hoja no es pública');
+  const [head = [], ...body] = parseCSV(text);
+  const headers = head.map(key);
+  const rows = body.map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? '').trim()])));
+  return { headers, rows };
+}
+
+async function loadData() {
+  const H = CONFIG.HOJAS;
+  const [prod, cats, banner] = await Promise.allSettled([fetchSheet(H.productos), fetchSheet(H.categorias), fetchSheet(H.banner)]);
+
+  if (prod.status !== 'fulfilled') throw prod.reason;
+  if (!prod.value.headers.includes('nombre')) throw new Error(`No se encontró la hoja "${H.productos}" con la columna "Nombre"`);
+
+  // Varias filas con el mismo Nombre (y Categoría) son UN producto en varios colores:
+  // cada fila aporta su color y sus propias fotos.
+  const groups = new Map();
+  prod.value.rows.filter((r) => r.nombre).forEach((r) => {
+    const k = `${norm(r.nombre)}|${norm(r.categoria)}`;
+    let p = groups.get(k);
+    if (!p) { p = { nombre: r.nombre, categoria: r.categoria || '', material: '', tallas: [], colores: [], variantes: [] }; groups.set(k, p); }
+    if (!p.material) p.material = r.material || '';
+    list(r.tallas).forEach((t) => { if (!p.tallas.includes(t)) p.tallas.push(t); });
+    const colores = list(r.colores);
+    colores.forEach((c) => { if (!p.colores.some((x) => norm(x) === norm(c))) p.colores.push(c); });
+    p.variantes.push({ colores: colores.map(norm), fotos: [r.foto1, r.foto2, r.foto3, r.foto4].filter(Boolean) });
+  });
+  let products = [...groups.values()];
+  products.forEach((p) => {
+    // Un color sin fotos propias usa las del primer color que sí tenga.
+    const conFotos = p.variantes.find((v) => v.fotos.length);
+    p.variantes.forEach((v) => { if (!v.fotos.length && conFotos) v.fotos = conFotos.fotos; });
+    p.fotos = p.variantes[0].fotos;
+    p.porColor = p.variantes.length > 1 && p.colores.length > 1;
+    p.search = norm([p.nombre, p.material, p.categoria, p.colores.join(' ')].join(' '));
+  });
+
+  // Categorías: si pides una pestaña que no existe, Google devuelve la primera,
+  // por eso se comprueba que tenga las columnas "Activa"/"Orden".
+  let categories;
+  const c = cats.status === 'fulfilled' ? cats.value : null;
+  if (c && c.headers.includes('categoria') && (c.headers.includes('activa') || c.headers.includes('orden'))) {
+    categories = c.rows
+      .filter((r) => r.categoria && isTrue(r.activa))
+      .map((r, i) => ({ nombre: r.categoria, orden: parseFloat(String(r.orden).replace(',', '.')), i }))
+      .sort((a, b) => (isNaN(a.orden) ? Infinity : a.orden) - (isNaN(b.orden) ? Infinity : b.orden) || a.i - b.i)
+      .map((r) => r.nombre);
+    // Los productos de categorías ocultas o eliminadas no se muestran.
+    const active = new Set(categories.map(norm));
+    products = products.filter((p) => !p.categoria || active.has(norm(p.categoria)));
+  } else {
+    console.warn(`No se pudo leer la hoja "${H.categorias}"; se usan las categorías de los productos.`);
+    categories = [...new Map(products.filter((p) => p.categoria).map((p) => [norm(p.categoria), p.categoria])).values()];
+  }
+
+  let bannerData = null;
+  const b = banner.status === 'fulfilled' ? banner.value : null;
+  if (b && b.headers.includes('campo') && b.headers.includes('valor')) {
+    bannerData = Object.fromEntries(b.rows.filter((r) => r.campo).map((r) => [key(r.campo), r.valor]));
+  }
+
+  return { products, categories, banner: bannerData };
+}
 
 /* ---------- Banner ---------- */
-.banner { margin-top: clamp(16px, 3vw, 32px); position: relative; }
-.banner-main {
-  position: relative; overflow: hidden; background: var(--ph);
-  min-height: clamp(380px, 46vw, 620px);
-  display: flex; align-items: flex-end;
-}
-.banner-main > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
-.banner-main > img.is-loaded { opacity: 1; }
-.banner.has-img .banner-main::after { content: ""; position: absolute; inset: 0; background: rgba(15, 15, 15, .32); }
-.banner-text { position: relative; z-index: 1; padding: clamp(24px, 5vw, 64px); max-width: 620px; }
-.banner.has-img .banner-text { color: #fff; }
-.banner-title { font: 600 clamp(32px, 5.4vw, 72px)/1 var(--display); letter-spacing: -.01em; text-transform: uppercase; text-wrap: balance; }
-.banner-sub { margin-top: 16px; font-size: clamp(15px, 1.3vw, 18px); max-width: 44ch; }
-.banner-text .btn { margin-top: 28px; }
 
-.banner-photos {
-  position: absolute; z-index: 2;
-  right: calc(var(--gutter) + clamp(24px, 4vw, 56px)); bottom: clamp(24px, 4vw, 56px);
-  display: grid; grid-auto-flow: column; grid-auto-columns: clamp(110px, 12.5vw, 190px); gap: 12px;
-}
-.sq { aspect-ratio: 1; background: var(--ph); border: 6px solid #fff; overflow: hidden; position: relative; }
-.sq img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .5s; }
-.sq img.is-loaded { opacity: 1; }
+function renderBanner(b) {
+  const box = $('#banner');
+  box.replaceChildren();
+  if (!b) { box.hidden = true; return; }
+  const photos = [b.foto1, b.foto2, b.foto3].filter(Boolean);
+  if (!b.imagenprincipal && !b.titulo && !b.subtitulo && !photos.length) { box.hidden = true; return; }
 
-/* ---------- Catálogo ---------- */
-.catalog { padding-block: clamp(40px, 6vw, 88px) clamp(64px, 8vw, 120px); scroll-margin-top: 130px; }
-.catalog-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-bottom: 16px; margin-bottom: clamp(20px, 3vw, 40px); border-bottom: 1px solid var(--line); }
-.catalog-head h2 { font: 600 clamp(20px, 2.2vw, 28px)/1.1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
-.catalog-head p { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  const main = el('div', { class: 'banner-main' });
+  if (b.imagenprincipal) {
+    box.classList.add('has-img');
+    main.append(makeImg(b.imagenprincipal, '', 2000, () => box.classList.remove('has-img'), true));
+  } else box.classList.remove('has-img');
 
-.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 12px; }
+  const text = el('div', { class: 'banner-text' });
+  if (b.titulo) text.append(el('h2', { class: 'banner-title', text: b.titulo }));
+  if (b.subtitulo) text.append(el('p', { class: 'banner-sub', text: b.subtitulo }));
+  if (b.botontexto) {
+    const href = safeUrl(b.botonurl || '') || '#catalogo';
+    const ext = /^https?:/i.test(href);
+    text.append(el('a', { class: `btn ${b.imagenprincipal ? 'btn-light' : ''}`, href, target: ext ? '_blank' : null, rel: ext ? 'noopener' : null, text: b.botontexto }));
+  }
+  if (text.children.length) main.append(text);
+  box.append(main);
 
-.card { display: flex; flex-direction: column; min-width: 0; }
-.media { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; background: var(--ph); overflow: hidden; }
-.media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .45s; }
-.media img.is-loaded { opacity: 1; }
-.media img.alt.is-loaded { opacity: 0; }
-.media.is-empty::after, .g-main.is-empty::after {
-  content: "Foto no disponible"; position: absolute; inset: 0; display: grid; place-items: center;
-  font: 500 10px/1 var(--display); letter-spacing: .18em; text-transform: uppercase; color: #b3b0a8;
-}
-.card-body { display: flex; flex-direction: column; flex: 1; padding-top: 12px; }
-.card-name { text-align: left; font: 600 14px/1.25 var(--display); letter-spacing: .05em; text-transform: uppercase; }
-.card-name:hover { background: var(--accent); }
-.card-material { margin-top: 4px; color: var(--muted); font-size: 13px; }
-.specs { margin-top: 10px; display: grid; gap: 4px; font-size: 12.5px; }
-.specs div { display: flex; flex-wrap: wrap; gap: 2px 8px; }
-.specs dt { font: 500 10px/1.9 var(--display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-.card .btn { margin-top: auto; width: 100%; padding: 0 8px; font-size: 11px; }
-.card .specs { margin-bottom: 14px; }
-
-/* Skeleton de carga */
-.skeleton .media, .skeleton .line { background: var(--ph); animation: pulse 1.4s ease-in-out infinite; }
-.skeleton .line { height: 12px; margin-top: 12px; width: 70%; }
-.skeleton .line.short { width: 40%; }
-@keyframes pulse { 50% { opacity: .5; } }
-
-/* Estados: vacío / error */
-.state { padding: clamp(48px, 8vw, 96px) 0; text-align: center; color: var(--muted); }
-.state strong { display: block; margin-bottom: 8px; font: 600 16px/1.2 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
-.state .btn { margin-top: 24px; }
-
-/* ---------- Detalle (modal) ---------- */
-.modal { border: 0; padding: 0; background: var(--bg); color: var(--ink); width: min(1040px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px); overflow: auto; }
-.modal::backdrop { background: rgba(20, 20, 20, .5); }
-.modal-in { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
-.modal-close { position: absolute; top: 8px; right: 8px; z-index: 3; background: #fff; }
-.modal-close svg { stroke-width: 1.4; }
-.gallery { padding: 16px; }
-.g-main { position: relative; aspect-ratio: 3 / 4; max-height: calc(100dvh - 180px); width: 100%; background: var(--ph); overflow: hidden; }
-.g-main img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .35s; }
-.g-main img.is-loaded { opacity: 1; }
-.g-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; background: #fff; }
-.g-nav.prev { left: 8px; } .g-nav.next { right: 8px; }
-.thumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-.thumb { position: relative; aspect-ratio: 1; background: var(--ph); overflow: hidden; border: 1px solid transparent; }
-.thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .35s; }
-.thumb img.is-loaded { opacity: 1; }
-.thumb[aria-current="true"] { border-color: var(--ink); }
-.thumb:hover { border-color: var(--accent); }
-
-.info { padding: clamp(24px, 4vw, 56px); padding-top: 64px; display: flex; flex-direction: column; }
-.info-cat { font: 500 11px/1 var(--display); letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
-.info h2 { margin-top: 12px; font: 600 clamp(24px, 3vw, 36px)/1.05 var(--display); text-transform: uppercase; letter-spacing: .01em; }
-.info-specs { margin-top: 28px; border-top: 1px solid var(--line); }
-.info-specs div { padding: 16px 0; border-bottom: 1px solid var(--line); }
-.info-specs dt { font: 500 10px/1 var(--display); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { min-width: 40px; padding: 8px 12px; text-align: center; border: 1px solid var(--line); font-size: 13px; }
-.info .btn { margin-top: 32px; min-height: 52px; }
-
-/* ---------- Footer y botón flotante ---------- */
-.footer { border-top: 1px solid var(--line); padding-block: 32px 96px; color: var(--muted); font-size: 13px; }
-.footer-in { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between; }
-.footer .logo { font-size: 14px; color: var(--ink); }
-
-.fab {
-  position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 15;
-  width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--ink); color: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); transition: background .2s, color .2s;
-}
-.fab:hover, .fab:active { background: var(--accent); color: var(--ink); }
-.fab svg.wa { width: 26px; height: 26px; }
-
-/* ---------- Responsive ---------- */
-@media (min-width: 720px) {
-  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 48px 20px; }
-  .card .btn { font-size: 12px; }
-}
-@media (min-width: 1100px) {
-  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 56px 24px; }
-  .fab { display: none; }
-  .footer { padding-bottom: 32px; }
-}
-@media (hover: hover) {
-  .card:hover .media img.alt.is-loaded { opacity: 1; }
+  if (photos.length) {
+    const wrap = el('div', { class: 'banner-photos' });
+    photos.forEach((src) => {
+      const sq = el('div', { class: 'sq' });
+      sq.append(makeImg(src, '', 600, () => { sq.remove(); if (!wrap.children.length) wrap.remove(); }));
+      wrap.append(sq);
+    });
+    box.append(wrap);
+  }
+  box.hidden = false;
 }
 
-@media (max-width: 899px) {
-  /* Banner: las 3 fotos pasan debajo */
-  .banner-photos { position: static; grid-auto-flow: initial; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-  .sq { border: 0; }
-  .banner-main { min-height: clamp(360px, 90vw, 520px); }
+/* ---------- Categorías ---------- */
+
+function renderCategories() {
+  const box = $('#cats');
+  const make = (label, value) => el('button', {
+    class: 'cat', type: 'button', text: label, 'aria-pressed': String(state.cat === value),
+    onclick: (e) => {
+      state.cat = value;
+      box.querySelectorAll('.cat').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+      e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      renderGrid();
+      const top = $('#catalogo').getBoundingClientRect().top;
+      if (top < 0 || top > window.innerHeight * 0.6) $('#catalogo').scrollIntoView();
+    },
+  });
+  box.replaceChildren(make(CONFIG.TEXTO_TODOS, null), ...state.categories.map((c) => make(c, norm(c))));
 }
 
-@media (max-width: 719px) {
-  .header-top { grid-template-columns: 1fr auto; min-height: 60px; row-gap: 0; }
-  .logo { font-size: 14px; letter-spacing: .12em; gap: 10px; }
-  .logo img { width: 38px; height: 38px; }
-  .header-actions .btn span { display: none; }
-  .search-toggle { display: inline-grid; }
-  .header-actions .btn { padding: 0 12px; min-height: 40px; }
-  .search { display: none; grid-column: 1 / -1; grid-row: 2; margin-bottom: 10px; }
-  .header.search-open .search { display: flex; }
-  .header.search-open .search-toggle { background: var(--accent); }
-  .cats-scroll > :first-child { margin-left: 0; }
+/* ---------- Tarjetas ---------- */
 
-  .modal { width: 100vw; height: 100dvh; max-height: none; margin: 0; }
-  .modal-in { grid-template-columns: 1fr; }
-  .gallery { padding: 0; }
-  .g-main { max-height: 68dvh; }
-  .thumbs { padding: 0 16px; }
-  .info { padding: 24px 16px 40px; }
+const fotosDe = (p, color) => (p.variantes.find((v) => v.colores.includes(norm(color))) || p.variantes[0]).fotos;
+
+// Colores como botones: al elegir uno se llama onPick(color).
+function colorButtons(p, cls, selected, onPick) {
+  const buttons = p.colores.map((c) => el('button', {
+    class: cls, type: 'button', text: c, 'aria-pressed': String(c === selected),
+    onclick: (e) => {
+      e.stopPropagation();
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
+      onPick(c);
+    },
+  }));
+  return buttons;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+function spec(label, values) {
+  return values.length ? el('div', {}, el('dt', { text: label }), el('dd', { text: values.join(' · ') })) : null;
 }
 
-/* ---------- Selección de color ---------- */
-.swatches { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
-.sw { min-height: 30px; padding: 0 10px; border: 1px solid var(--line); font-size: 12px; transition: background .2s, border-color .2s; }
-button.chip { cursor: pointer; transition: background .2s, border-color .2s; }
-.sw:hover, button.chip:hover { background: var(--accent); border-color: var(--accent); }
-.sw[aria-pressed="true"], button.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--ink); }
+function card(p) {
+  let color = p.porColor ? p.colores[0] : null;
+  let fotos = p.fotos;
+  let altLoaded = false;
+
+  const media = el('button', { class: 'media', type: 'button', 'aria-label': `Ver detalle de ${p.nombre}`, onclick: () => openProduct(p, color) });
+  function paint() {
+    media.querySelectorAll('img').forEach((n) => n.remove());
+    media.classList.remove('is-empty');
+    altLoaded = false;
+    if (fotos[0]) media.append(makeImg(fotos[0], p.nombre, 800, () => media.classList.add('is-empty')));
+    else media.classList.add('is-empty');
+  }
+  paint();
+
+  // Foto 2 al pasar el mouse: se descarga solo la primera vez que se necesita.
+  if (matchMedia('(hover: hover)').matches) {
+    media.addEventListener('pointerenter', () => {
+      if (altLoaded || !fotos[1]) return;
+      altLoaded = true;
+      const alt = makeImg(fotos[1], '', 800, null, true);
+      alt.classList.add('alt');
+      media.append(alt);
+    });
+  }
+
+  const wa = waButton(p.nombre);
+  if (color) wa.href = waLink(p.nombre, color);
+
+  let colores = spec('Colores', p.colores);
+  if (p.porColor) {
+    colores = el('div', {}, el('dt', { text: 'Colores' }),
+      el('dd', { class: 'swatches' }, colorButtons(p, 'sw', color, (c) => {
+        color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c);
+      })));
+  }
+
+  const specs = el('dl', { class: 'specs' }, spec('Tallas', p.tallas), colores);
+  return el('article', { class: 'card' }, media,
+    el('div', { class: 'card-body' },
+      el('h3', {}, el('button', { class: 'card-name', type: 'button', text: p.nombre, onclick: () => openProduct(p, color) })),
+      p.material ? el('p', { class: 'card-material', text: p.material }) : null,
+      specs.children.length ? specs : el('div', { class: 'specs' }),
+      wa));
+}
+
+function renderGrid() {
+  const tokens = norm(state.query).split(' ').filter(Boolean);
+  const items = state.products.filter((p) =>
+    (!state.cat || norm(p.categoria) === state.cat) && tokens.every((t) => p.search.includes(t)));
+
+  const title = state.cat ? state.categories.find((c) => norm(c) === state.cat) : CONFIG.TEXTO_TODOS;
+  $('#catalogTitle').textContent = state.query.trim() ? `Resultados: “${state.query.trim()}”` : title;
+  $('#count').textContent = `${items.length} ${items.length === 1 ? 'producto' : 'productos'}`;
+  $('#grid').replaceChildren(...items.map(card));
+
+  if (!items.length) {
+    showState(state.products.length ? 'Sin resultados' : 'Aún no hay productos',
+      state.products.length ? 'Prueba con otra búsqueda o categoría.' : 'Muy pronto encontrarás aquí el catálogo.');
+  } else $('#state').hidden = true;
+}
+
+function showState(title, text, retry) {
+  const box = $('#state');
+  box.replaceChildren(el('strong', { text: title }), el('span', { text }));
+  if (retry) box.append(el('div', {}, el('button', { class: 'btn', type: 'button', text: 'Reintentar', onclick: init })));
+  box.hidden = false;
+}
+
+function showSkeleton() {
+  $('#state').hidden = true;
+  $('#grid').replaceChildren(...Array.from({ length: 8 }, () =>
+    el('div', { class: 'card skeleton', 'aria-hidden': 'true' }, el('div', { class: 'media' }), el('div', { class: 'line' }), el('div', { class: 'line short' }))));
+}
+
+/* ---------- Detalle del producto ---------- */
+
+function openProduct(p, startColor) {
+  const modal = $('#modal');
+  const mainBox = el('div', { class: 'g-main' });
+  const thumbs = el('div', { class: 'thumbs' });
+  let photos = [];
+  let current = 0;
+
+  const nav = [
+    el('button', { class: 'icon-btn g-nav prev', type: 'button', 'aria-label': 'Foto anterior', onclick: () => show(current - 1) }, svg('M15 5l-7 7 7 7', null, true)),
+    el('button', { class: 'icon-btn g-nav next', type: 'button', 'aria-label': 'Foto siguiente', onclick: () => show(current + 1) }, svg('M9 5l7 7-7 7', null, true)),
+  ];
+  mainBox.append(...nav);
+
+  function drop(photo) {            // una foto que no carga desaparece de la galería
+    if (!photos.includes(photo)) return;
+    photo.thumb?.remove();
+    photos = photos.filter((x) => x !== photo);
+    show(0);
+  }
+
+  function show(i) {
+    mainBox.querySelectorAll('img').forEach((n) => n.remove());
+    const multi = photos.length > 1;
+    nav.forEach((b) => { b.hidden = !multi; });
+    thumbs.hidden = !multi;
+    mainBox.classList.toggle('is-empty', !photos.length);
+    if (!photos.length) return;
+    current = (i + photos.length) % photos.length;
+    const photo = photos[current];
+    mainBox.append(makeImg(photo.src, p.nombre, 1600, () => drop(photo), true));
+    photos.forEach((x, n) => x.thumb?.setAttribute('aria-current', String(n === current)));
+  }
+
+  // Carga en la galería las fotos de un color (o las del producto).
+  function loadPhotos(fotos) {
+    photos = fotos.map((src) => ({ src }));
+    thumbs.replaceChildren();
+    if (photos.length > 1) {
+      photos.forEach((photo, n) => {
+        photo.thumb = el('button', { class: 'thumb', type: 'button', 'aria-label': `Foto ${n + 1}`, onclick: () => show(photos.indexOf(photo)) });
+        photo.thumb.append(makeImg(photo.src, '', 300, () => drop(photo), true));
+        thumbs.append(photo.thumb);
+      });
+    }
+    show(0);
+  }
+
+  let color = p.porColor ? (startColor || p.colores[0]) : null;
+  const wa = waButton(p.nombre);
+  if (color) wa.href = waLink(p.nombre, color);
+  loadPhotos(color ? fotosDe(p, color) : p.fotos);
+
+  const chips = (label, values) => values.length
+    ? el('div', {}, el('dt', { text: label }), el('dd', { class: 'chips' }, values.map((v) => el('span', { class: 'chip', text: v })))) : null;
+  const colorRow = p.porColor
+    ? el('div', {}, el('dt', { text: 'Colores' }), el('dd', { class: 'chips' }, colorButtons(p, 'chip', color, (c) => {
+      color = c; loadPhotos(fotosDe(p, c)); wa.href = waLink(p.nombre, c);
+    })))
+    : chips('Colores', p.colores);
+  const specs = el('dl', { class: 'info-specs' },
+    p.material ? el('div', {}, el('dt', { text: 'Material' }), el('dd', { text: p.material })) : null,
+    chips('Tallas', p.tallas), colorRow);
+
+  modal.replaceChildren(
+    el('button', { class: 'icon-btn modal-close', type: 'button', 'aria-label': 'Cerrar', onclick: () => modal.close() }, svg('M6 6l12 12M18 6L6 18', null, true)),
+    el('div', { class: 'modal-in' },
+      el('div', { class: 'gallery' }, mainBox, thumbs),
+      el('div', { class: 'info' },
+        p.categoria ? el('p', { class: 'info-cat', text: p.categoria }) : null,
+        el('h2', { id: 'modalTitle', text: p.nombre }),
+        specs.children.length ? specs : null,
+        wa)));
+
+  modal.onkeydown = (e) => {
+    if (photos.length < 2) return;
+    if (e.key === 'ArrowLeft') show(current - 1);
+    if (e.key === 'ArrowRight') show(current + 1);
+  };
+  document.documentElement.classList.add('lock');
+  modal.showModal();
+  modal.scrollTop = 0;
+}
+
+/* ---------- Inicio ---------- */
+
+function setupOnce() {
+  document.querySelectorAll('[data-wa]').forEach((a) => { a.href = waLink(); });
+
+  const modal = $('#modal');
+  modal.addEventListener('close', () => document.documentElement.classList.remove('lock'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
+
+  let timer;
+  $('#search').addEventListener('input', (e) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { state.query = e.target.value; renderGrid(); }, 120);
+  });
+  $('#searchForm').addEventListener('submit', (e) => { e.preventDefault(); $('#search').blur(); $('#catalogo').scrollIntoView(); });
+  $('#searchToggle').addEventListener('click', (e) => {
+    const open = $('#header').classList.toggle('search-open');
+    e.currentTarget.setAttribute('aria-expanded', String(open));
+    if (open) $('#search').focus();
+  });
+}
+
+async function init() {
+  showSkeleton();
+  if (!sheetId()) {
+    $('#grid').replaceChildren();
+    showState('Falta conectar Google Sheets', 'Pega el ID del archivo en CONFIG.SHEET_ID, al inicio de script.js.');
+    return;
+  }
+  try {
+    const data = await loadData();
+    state.products = data.products;
+    state.categories = data.categories;
+    if (state.cat && !data.categories.some((c) => norm(c) === state.cat)) state.cat = null;
+    renderBanner(data.banner);
+    renderCategories();
+    renderGrid();
+  } catch (err) {
+    console.error('Catálogo:', err);
+    $('#grid').replaceChildren();
+    $('#count').textContent = '';
+    showState('No pudimos cargar el catálogo', 'Revisa tu conexión e inténtalo de nuevo. También puedes escribirnos por WhatsApp.', true);
+  }
+}
+
+setupOnce();
+init();
