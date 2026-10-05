@@ -229,3 +229,10 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Selección de color ---------- */
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; width: 100%; }
+.sw { min-height: 30px; padding: 0 10px; border: 1px solid var(--line); font-size: 12px; transition: background .2s, border-color .2s; }
+button.chip { cursor: pointer; transition: background .2s, border-color .2s; }
+.sw:hover, button.chip:hover { background: var(--accent); border-color: var(--accent); }
+.sw[aria-pressed="true"], button.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--ink); }
