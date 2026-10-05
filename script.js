@@ -13,7 +13,7 @@ const CONFIG = {
 
   // Número de WhatsApp: código de país + número, solo dígitos (57 = Colombia).
   // ESTE ES EL ÚNICO LUGAR DONDE SE DEFINE.
-  WHATSAPP: '57321 8618340',
+  WHATSAPP: '573218618340',
 
   MENSAJE_GENERAL: 'Hola, quiero más información sobre el catálogo.',
   // {producto} se reemplaza por el nombre del producto.
