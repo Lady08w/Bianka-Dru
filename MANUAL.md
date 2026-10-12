@@ -94,7 +94,9 @@ La última columna de la pestaña se llama **Publicar**. Solo aparecen en el cat
 
 ### Una prenda en varios colores, cada uno con su foto
 
-Haz **una fila por color**, repitiendo exactamente el mismo Nombre y Categoría. En la página salen como un solo producto, y al tocar un color cambian las fotos.
+Haz **una fila por color**, repitiendo exactamente el mismo Nombre y Categoría. En el catálogo sale **una tarjeta por cada color**, con su foto y su precio; al abrir cualquiera, la ficha muestra la prenda con todos sus colores para cambiar entre ellos.
+
+(Si prefieres una sola tarjeta con botones de color, en `script.js` cambia `TARJETA_POR_COLOR: true` por `false`.)
 
 | Nombre | Categoría | Material | Tallas | Colores | Foto 1 | Foto 2 |
 |---|---|---|---|---|---|---|

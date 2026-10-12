@@ -26,6 +26,10 @@ const CONFIG = {
 
   TEXTO_TODOS: 'Todos',
 
+  // true: una prenda con varios colores sale en el catálogo como una tarjeta por color
+  // (en la ficha se puede cambiar de color). false: una sola tarjeta con botones de color.
+  TARJETA_POR_COLOR: true,
+
   // Moneda para mostrar precios numéricos (COP = peso colombiano).
   MONEDA: 'COP',
 };
@@ -319,9 +323,9 @@ function spec(label, values) {
   return values.length ? el('div', {}, el('dt', { text: label }), el('dd', { text: values.join(' · ') })) : null;
 }
 
-function card(p, i) {
-  let color = p.porColor ? p.colores[0] : null;
-  let fotos = p.fotos;
+function card(p, i, fijo) {
+  let color = fijo || (p.porColor ? p.colores[0] : null);
+  let fotos = fijo ? fotosDe(p, fijo) : p.fotos;
   let altLoaded = false;
 
   const media = el('button', { class: 'media', type: 'button', 'aria-label': `Ver detalle de ${p.nombre}`, onclick: () => openProduct(p, color) });
@@ -350,7 +354,8 @@ function card(p, i) {
   const precio = el('p', { class: 'card-price', text: precioDe(p, color) });
 
   let colores = spec('Colores', p.colores);
-  if (p.porColor) {
+  if (fijo) colores = spec('Color', [fijo]);
+  else if (p.porColor) {
     colores = el('div', {}, el('dt', { text: 'Colores' }),
       el('dd', { class: 'swatches' }, colorButtons(p, 'sw', color, (c) => {
         color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c); precio.textContent = precioDe(p, c);
@@ -369,13 +374,24 @@ function card(p, i) {
 
 function renderGrid() {
   const tokens = norm(state.query).split(' ').filter(Boolean);
-  const items = state.products.filter((p) =>
+  const found = state.products.filter((p) =>
     (!state.cat || norm(p.categoria) === state.cat) && tokens.every((t) => p.search.includes(t)));
+
+  // Una tarjeta por color. Si la búsqueda nombra un color, solo sale esa tarjeta.
+  const items = [];
+  found.forEach((p) => {
+    if (!(CONFIG.TARJETA_POR_COLOR && p.porColor)) { items.push({ p }); return; }
+    const pedidos = tokens.filter((t) => p.colores.some((c) => norm(c).includes(t)));
+    p.colores.forEach((c) => {
+      if (pedidos.length && !pedidos.every((t) => norm(c).includes(t))) return;
+      items.push({ p, color: c });
+    });
+  });
 
   const title = state.cat ? state.categories.find((c) => norm(c) === state.cat) : CONFIG.TEXTO_TODOS;
   $('#catalogTitle').textContent = state.query.trim() ? `Resultados: “${state.query.trim()}”` : title;
   $('#count').textContent = `${items.length} ${items.length === 1 ? 'producto' : 'productos'}`;
-  $('#grid').replaceChildren(...items.map(card));
+  $('#grid').replaceChildren(...items.map((it, i) => card(it.p, i, it.color)));
 
   if (!items.length) {
     showState(state.products.length ? 'Sin resultados' : 'Aún no hay productos',
