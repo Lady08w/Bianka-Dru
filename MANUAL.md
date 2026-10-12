@@ -66,6 +66,47 @@ Si una foto no aparece, casi siempre es porque no está compartida como "Cualqui
 - La Categoría debe escribirse igual que en la pestaña `Categorias` (mayúsculas y tildes no importan).
 - Las columnas de esta pestaña deben estar en formato **Texto sin formato** (la plantilla ya viene así). Si creas la hoja desde cero: selecciona todo → Formato → Número → Texto sin formato. Evita que una talla como `32` desaparezca.
 
+### Precio — columna `Precio`
+
+| Escribes | Se ve en la página |
+|---|---|
+| `89900` o `89.900` | $ 89.900 |
+| `Desde 80000` | Desde 80000 (texto tal cual) |
+| `Consultar` | Consultar |
+| vacío | no se muestra precio |
+
+- Escribe solo el número, sin puntos ni signo: la página le da el formato.
+- En prendas con una fila por color, cada color puede tener su propio precio; si solo lo pones en la primera fila, se usa para todos.
+- La columna debe estar en formato **Texto sin formato** (Formato → Número → Texto sin formato), sobre todo si mezclas números con textos como "Consultar".
+
+### Publicar u ocultar un producto — columna `Publicar`
+
+La última columna de la pestaña se llama **Publicar**. Solo aparecen en el catálogo las filas que digan `ok`.
+
+| Publicar | Resultado |
+|---|---|
+| `ok` | La fila se publica. |
+| vacío o cualquier otra cosa (`pendiente`, `agotado`…) | La fila no aparece. |
+
+- Sirve para dejar productos cargados sin mostrarlos, o para ocultar uno agotado sin borrarlo.
+- En prendas con varios colores (una fila por color) puedes ocultar un solo color quitándole el `ok`.
+- Da igual `ok`, `OK` u `Ok`.
+
+### Una prenda en varios colores, cada uno con su foto
+
+Haz **una fila por color**, repitiendo exactamente el mismo Nombre y Categoría. En la página salen como un solo producto, y al tocar un color cambian las fotos.
+
+| Nombre | Categoría | Material | Tallas | Colores | Foto 1 | Foto 2 |
+|---|---|---|---|---|---|---|
+| Camisa Oxford | Camisas | 100% algodón | S,M,L,XL | Blanco | foto blanca | otra foto blanca |
+| Camisa Oxford | Camisas | 100% algodón | S,M,L,XL | Azul | foto azul | otra foto azul |
+
+- Cada color puede tener hasta 4 fotos propias.
+- El color de la primera fila es el que se ve por defecto.
+- Si un color no tiene fotos, usa las del primer color.
+- Si no necesitas foto por color, sigue igual que antes: una sola fila con `Blanco, Azul`.
+- El mensaje de WhatsApp incluye el color que el cliente eligió.
+
 ---
 
 ## 3. Categorías — pestaña `Categorias`

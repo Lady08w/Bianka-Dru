@@ -236,3 +236,7 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 button.chip { cursor: pointer; transition: background .2s, border-color .2s; }
 .sw:hover, button.chip:hover { background: var(--accent); border-color: var(--accent); }
 .sw[aria-pressed="true"], button.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--ink); }
+
+/* ---------- Precio ---------- */
+.card-price { margin-top: 6px; font: 600 15px/1.2 var(--display); letter-spacing: .02em; }
+.info-price { margin-top: 14px; font: 500 clamp(20px, 2.2vw, 26px)/1.2 var(--display); letter-spacing: .02em; }

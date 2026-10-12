@@ -25,6 +25,9 @@ const CONFIG = {
   HOJAS: { productos: 'Productos', categorias: 'Categorias', banner: 'Banner' },
 
   TEXTO_TODOS: 'Todos',
+
+  // Moneda para mostrar precios numéricos (COP = peso colombiano).
+  MONEDA: 'COP',
 };
 
 /* -------------------------------------------------------------------------- */
@@ -75,6 +78,19 @@ function waLink(product, color) {
   return `https://wa.me/${String(CONFIG.WHATSAPP).replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
 }
 
+// Precio: si es un número (89900, 89.900, $89.900) se muestra como moneda;
+// si es texto ("Desde $80.000", "Consultar") se muestra tal cual.
+function formatPrecio(raw) {
+  const t = String(raw ?? '').trim();
+  if (!t) return '';
+  if (!/^\$?\s*[\d.,\s]+$/.test(t)) return t;
+  const n = Number(t.replace(/[.,]\d{1,2}$/, '').replace(/\D/g, ''));
+  if (!n) return t;
+  try {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: CONFIG.MONEDA, maximumFractionDigits: 0 }).format(n);
+  } catch { return `$${n.toLocaleString('es-CO')}`; }
+}
+
 function waButton(product, extraClass = '') {
   return el('a', { class: `btn ${extraClass}`, href: waLink(product), target: '_blank', rel: 'noopener', 'aria-label': `Pedir información de ${product} por WhatsApp` },
     svg(WA_PATH, 'wa'), el('span', { text: 'WhatsApp' }));
@@ -84,6 +100,13 @@ function waButton(product, extraClass = '') {
 const safeUrl = (u) => (/^(https?:\/\/|#|\/|mailto:|tel:)/i.test(u.trim()) ? u.trim() : null);
 
 /* ---------- Imágenes de Google Drive ---------- */
+
+// Tamaño que se le pide a Drive según la pantalla: en celular se descargan
+// imágenes más livianas (cargan más rápido y gastan menos datos).
+const MOVIL = window.innerWidth < 720;
+const ANCHO = MOVIL
+  ? { tarjeta: 500, detalle: 1000, miniatura: 200, banner: 1000, bannerFoto: 300 }
+  : { tarjeta: 700, detalle: 1400, miniatura: 200, banner: 2000, bannerFoto: 500 };
 
 // Acepta el enlace "Copiar vínculo" de Drive, un ID suelto o cualquier URL directa de imagen.
 function driveId(raw) {
@@ -107,7 +130,7 @@ function imageSources(raw, width) {
 function makeImg(raw, alt, width, onFail, eager) {
   const sources = imageSources(raw, width);
   let i = 0;
-  const img = el('img', { alt, loading: eager ? 'eager' : 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
+  const img = el('img', { alt, loading: eager ? 'eager' : 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', fetchpriority: eager === 'alta' ? 'high' : null });
   img.addEventListener('load', () => img.classList.add('is-loaded'));
   img.addEventListener('error', () => {
     i += 1;
@@ -178,7 +201,7 @@ async function loadData() {
     list(r.tallas).forEach((t) => { if (!p.tallas.includes(t)) p.tallas.push(t); });
     const colores = list(r.colores);
     colores.forEach((c) => { if (!p.colores.some((x) => norm(x) === norm(c))) p.colores.push(c); });
-    p.variantes.push({ colores: colores.map(norm), fotos: [r.foto1, r.foto2, r.foto3, r.foto4].filter(Boolean) });
+    p.variantes.push({ colores: colores.map(norm), precio: formatPrecio(r.precio), fotos: [r.foto1, r.foto2, r.foto3, r.foto4].filter(Boolean) });
   });
   let products = [...groups.values()];
   products.forEach((p) => {
@@ -186,6 +209,7 @@ async function loadData() {
     const conFotos = p.variantes.find((v) => v.fotos.length);
     p.variantes.forEach((v) => { if (!v.fotos.length && conFotos) v.fotos = conFotos.fotos; });
     p.fotos = p.variantes[0].fotos;
+    p.precio = (p.variantes.find((v) => v.precio) || {}).precio || '';
     p.porColor = p.variantes.length > 1 && p.colores.length > 1;
     p.search = norm([p.nombre, p.material, p.categoria, p.colores.join(' ')].join(' '));
   });
@@ -229,7 +253,7 @@ function renderBanner(b) {
   const main = el('div', { class: 'banner-main' });
   if (b.imagenprincipal) {
     box.classList.add('has-img');
-    main.append(makeImg(b.imagenprincipal, '', 2000, () => box.classList.remove('has-img'), true));
+    main.append(makeImg(b.imagenprincipal, '', ANCHO.banner, () => box.classList.remove('has-img'), 'alta'));
   } else box.classList.remove('has-img');
 
   const text = el('div', { class: 'banner-text' });
@@ -247,7 +271,7 @@ function renderBanner(b) {
     const wrap = el('div', { class: 'banner-photos' });
     photos.forEach((src) => {
       const sq = el('div', { class: 'sq' });
-      sq.append(makeImg(src, '', 600, () => { sq.remove(); if (!wrap.children.length) wrap.remove(); }));
+      sq.append(makeImg(src, '', ANCHO.bannerFoto, () => { sq.remove(); if (!wrap.children.length) wrap.remove(); }));
       wrap.append(sq);
     });
     box.append(wrap);
@@ -275,6 +299,7 @@ function renderCategories() {
 
 /* ---------- Tarjetas ---------- */
 
+const precioDe = (p, color) => (color && (p.variantes.find((v) => v.colores.includes(norm(color))) || {}).precio) || p.precio;
 const fotosDe = (p, color) => (p.variantes.find((v) => v.colores.includes(norm(color))) || p.variantes[0]).fotos;
 
 // Colores como botones: al elegir uno se llama onPick(color).
@@ -294,7 +319,7 @@ function spec(label, values) {
   return values.length ? el('div', {}, el('dt', { text: label }), el('dd', { text: values.join(' · ') })) : null;
 }
 
-function card(p) {
+function card(p, i) {
   let color = p.porColor ? p.colores[0] : null;
   let fotos = p.fotos;
   let altLoaded = false;
@@ -304,7 +329,7 @@ function card(p) {
     media.querySelectorAll('img').forEach((n) => n.remove());
     media.classList.remove('is-empty');
     altLoaded = false;
-    if (fotos[0]) media.append(makeImg(fotos[0], p.nombre, 800, () => media.classList.add('is-empty')));
+    if (fotos[0]) media.append(makeImg(fotos[0], p.nombre, ANCHO.tarjeta, () => media.classList.add('is-empty'), i < 4));
     else media.classList.add('is-empty');
   }
   paint();
@@ -314,7 +339,7 @@ function card(p) {
     media.addEventListener('pointerenter', () => {
       if (altLoaded || !fotos[1]) return;
       altLoaded = true;
-      const alt = makeImg(fotos[1], '', 800, null, true);
+      const alt = makeImg(fotos[1], '', ANCHO.tarjeta, null, true);
       alt.classList.add('alt');
       media.append(alt);
     });
@@ -322,12 +347,13 @@ function card(p) {
 
   const wa = waButton(p.nombre);
   if (color) wa.href = waLink(p.nombre, color);
+  const precio = el('p', { class: 'card-price', text: precioDe(p, color) });
 
   let colores = spec('Colores', p.colores);
   if (p.porColor) {
     colores = el('div', {}, el('dt', { text: 'Colores' }),
       el('dd', { class: 'swatches' }, colorButtons(p, 'sw', color, (c) => {
-        color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c);
+        color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c); precio.textContent = precioDe(p, c);
       })));
   }
 
@@ -335,6 +361,7 @@ function card(p) {
   return el('article', { class: 'card' }, media,
     el('div', { class: 'card-body' },
       el('h3', {}, el('button', { class: 'card-name', type: 'button', text: p.nombre, onclick: () => openProduct(p, color) })),
+      p.precio ? precio : null,
       p.material ? el('p', { class: 'card-material', text: p.material }) : null,
       specs.children.length ? specs : el('div', { class: 'specs' }),
       wa));
@@ -400,7 +427,7 @@ function openProduct(p, startColor) {
     if (!photos.length) return;
     current = (i + photos.length) % photos.length;
     const photo = photos[current];
-    mainBox.append(makeImg(photo.src, p.nombre, 1600, () => drop(photo), true));
+    mainBox.append(makeImg(photo.src, p.nombre, ANCHO.detalle, () => drop(photo), 'alta'));
     photos.forEach((x, n) => x.thumb?.setAttribute('aria-current', String(n === current)));
   }
 
@@ -411,7 +438,7 @@ function openProduct(p, startColor) {
     if (photos.length > 1) {
       photos.forEach((photo, n) => {
         photo.thumb = el('button', { class: 'thumb', type: 'button', 'aria-label': `Foto ${n + 1}`, onclick: () => show(photos.indexOf(photo)) });
-        photo.thumb.append(makeImg(photo.src, '', 300, () => drop(photo), true));
+        photo.thumb.append(makeImg(photo.src, '', ANCHO.miniatura, () => drop(photo), true));
         thumbs.append(photo.thumb);
       });
     }
@@ -421,13 +448,14 @@ function openProduct(p, startColor) {
   let color = p.porColor ? (startColor || p.colores[0]) : null;
   const wa = waButton(p.nombre);
   if (color) wa.href = waLink(p.nombre, color);
+  const precio = el('p', { class: 'info-price', text: precioDe(p, color) });
   loadPhotos(color ? fotosDe(p, color) : p.fotos);
 
   const chips = (label, values) => values.length
     ? el('div', {}, el('dt', { text: label }), el('dd', { class: 'chips' }, values.map((v) => el('span', { class: 'chip', text: v })))) : null;
   const colorRow = p.porColor
     ? el('div', {}, el('dt', { text: 'Colores' }), el('dd', { class: 'chips' }, colorButtons(p, 'chip', color, (c) => {
-      color = c; loadPhotos(fotosDe(p, c)); wa.href = waLink(p.nombre, c);
+      color = c; loadPhotos(fotosDe(p, c)); wa.href = waLink(p.nombre, c); precio.textContent = precioDe(p, c);
     })))
     : chips('Colores', p.colores);
   const specs = el('dl', { class: 'info-specs' },
@@ -441,6 +469,7 @@ function openProduct(p, startColor) {
       el('div', { class: 'info' },
         p.categoria ? el('p', { class: 'info-cat', text: p.categoria }) : null,
         el('h2', { id: 'modalTitle', text: p.nombre }),
+        p.precio ? precio : null,
         specs.children.length ? specs : null,
         wa)));
 
