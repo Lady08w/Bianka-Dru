@@ -25,6 +25,8 @@ const CONFIG = {
   HOJAS: { productos: 'Productos', categorias: 'Categorias', banner: 'Banner' },
 
   TEXTO_TODOS: 'Todos',
+  // Pestaña con los productos que tienen "Precio con descuento". Sale en rojo.
+  TEXTO_SALE: 'Sale',
 
   // true: una prenda con varios colores sale en el catálogo como una tarjeta por color
   // (en la ficha se puede cambiar de color). false: una sola tarjeta con botones de color.
@@ -38,6 +40,7 @@ const CONFIG = {
 
 const $ = (s) => document.querySelector(s);
 const state = { products: [], categories: [], cat: null, query: '' };
+const SALE = '__sale__';
 
 const WA_PATH = 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3.9 2.5 1.1 2.7.1.2 1.9 2.9 4.6 4 1.700.7 2.3.7 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z';
 
@@ -205,7 +208,7 @@ async function loadData() {
     list(r.tallas).forEach((t) => { if (!p.tallas.includes(t)) p.tallas.push(t); });
     const colores = list(r.colores);
     colores.forEach((c) => { if (!p.colores.some((x) => norm(x) === norm(c))) p.colores.push(c); });
-    p.variantes.push({ colores: colores.map(norm), precio: formatPrecio(r.precio), fotos: [r.foto1, r.foto2, r.foto3, r.foto4].filter(Boolean) });
+    p.variantes.push({ colores: colores.map(norm), precio: formatPrecio(r.precio), descuento: formatPrecio(r.preciocondescuento || r.preciodescuento || r.preciodespues), fotos: [r.foto1, r.foto2, r.foto3, r.foto4].filter(Boolean) });
   });
   let products = [...groups.values()];
   products.forEach((p) => {
@@ -213,7 +216,11 @@ async function loadData() {
     const conFotos = p.variantes.find((v) => v.fotos.length);
     p.variantes.forEach((v) => { if (!v.fotos.length && conFotos) v.fotos = conFotos.fotos; });
     p.fotos = p.variantes[0].fotos;
-    p.precio = (p.variantes.find((v) => v.precio) || {}).precio || '';
+    // Un color sin precio propio usa el del primero que lo tenga (igual con el descuento).
+    const base = p.variantes.find((v) => v.precio) || {};
+    p.variantes.forEach((v) => { if (!v.precio && base.precio) { v.precio = base.precio; if (!v.descuento) v.descuento = base.descuento; } });
+    p.precio = base.precio || '';
+    p.enSale = p.variantes.some((v) => v.descuento);
     p.porColor = p.variantes.length > 1 && p.colores.length > 1;
     p.search = norm([p.nombre, p.material, p.categoria, p.colores.join(' ')].join(' '));
   });
@@ -298,12 +305,26 @@ function renderCategories() {
       if (top < 0 || top > window.innerHeight * 0.6) $('#catalogo').scrollIntoView();
     },
   });
-  box.replaceChildren(make(CONFIG.TEXTO_TODOS, null), ...state.categories.map((c) => make(c, norm(c))));
+  const sale = state.products.some((p) => p.enSale) ? make(CONFIG.TEXTO_SALE, SALE) : null;
+  if (sale) sale.classList.add('cat-sale');
+  box.replaceChildren(make(CONFIG.TEXTO_TODOS, null), ...(sale ? [sale] : []), ...state.categories.map((c) => make(c, norm(c))));
 }
 
 /* ---------- Tarjetas ---------- */
 
-const precioDe = (p, color) => (color && (p.variantes.find((v) => v.colores.includes(norm(color))) || {}).precio) || p.precio;
+const varianteDe = (p, color) => (color && p.variantes.find((v) => v.colores.includes(norm(color)))) || p.variantes.find((v) => v.precio) || p.variantes[0];
+const enSaleColor = (p, color) => Boolean(varianteDe(p, color).descuento);
+
+// Llena el elemento de precio: normal, o tachado + precio con descuento en rojo.
+function pintarPrecio(box, p, color) {
+  const v = varianteDe(p, color);
+  box.replaceChildren();
+  box.classList.toggle('is-sale', Boolean(v.descuento));
+  if (v.descuento) {
+    box.append(el('s', { class: 'price-old', text: v.precio, 'aria-label': `Antes ${v.precio}` }),
+      el('span', { class: 'price-new', text: v.descuento, 'aria-label': `Ahora ${v.descuento}` }));
+  } else box.textContent = v.precio || '';
+}
 const fotosDe = (p, color) => (p.variantes.find((v) => v.colores.includes(norm(color))) || p.variantes[0]).fotos;
 
 // Colores como botones: al elegir uno se llama onPick(color).
@@ -351,14 +372,15 @@ function card(p, i, fijo) {
 
   const wa = waButton(p.nombre);
   if (color) wa.href = waLink(p.nombre, color);
-  const precio = el('p', { class: 'card-price', text: precioDe(p, color) });
+  const precio = el('p', { class: 'card-price' });
+  pintarPrecio(precio, p, color);
 
   let colores = spec('Colores', p.colores);
   if (fijo) colores = spec('Color', [fijo]);
   else if (p.porColor) {
     colores = el('div', {}, el('dt', { text: 'Colores' }),
       el('dd', { class: 'swatches' }, colorButtons(p, 'sw', color, (c) => {
-        color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c); precio.textContent = precioDe(p, c);
+        color = c; fotos = fotosDe(p, c); paint(); wa.href = waLink(p.nombre, c); pintarPrecio(precio, p, c);
       })));
   }
 
@@ -375,7 +397,7 @@ function card(p, i, fijo) {
 function renderGrid() {
   const tokens = norm(state.query).split(' ').filter(Boolean);
   const found = state.products.filter((p) =>
-    (!state.cat || norm(p.categoria) === state.cat) && tokens.every((t) => p.search.includes(t)));
+    (!state.cat || (state.cat === SALE ? p.enSale : norm(p.categoria) === state.cat)) && tokens.every((t) => p.search.includes(t)));
 
   // Una tarjeta por color. Si la búsqueda nombra un color, solo sale esa tarjeta.
   const items = [];
@@ -384,11 +406,12 @@ function renderGrid() {
     const pedidos = tokens.filter((t) => p.colores.some((c) => norm(c).includes(t)));
     p.colores.forEach((c) => {
       if (pedidos.length && !pedidos.every((t) => norm(c).includes(t))) return;
+      if (state.cat === SALE && !enSaleColor(p, c)) return;
       items.push({ p, color: c });
     });
   });
 
-  const title = state.cat ? state.categories.find((c) => norm(c) === state.cat) : CONFIG.TEXTO_TODOS;
+  const title = state.cat === SALE ? CONFIG.TEXTO_SALE : state.cat ? state.categories.find((c) => norm(c) === state.cat) : CONFIG.TEXTO_TODOS;
   $('#catalogTitle').textContent = state.query.trim() ? `Resultados: “${state.query.trim()}”` : title;
   $('#count').textContent = `${items.length} ${items.length === 1 ? 'producto' : 'productos'}`;
   $('#grid').replaceChildren(...items.map((it, i) => card(it.p, i, it.color)));
@@ -464,14 +487,15 @@ function openProduct(p, startColor) {
   let color = p.porColor ? (startColor || p.colores[0]) : null;
   const wa = waButton(p.nombre);
   if (color) wa.href = waLink(p.nombre, color);
-  const precio = el('p', { class: 'info-price', text: precioDe(p, color) });
+  const precio = el('p', { class: 'info-price' });
+  pintarPrecio(precio, p, color);
   loadPhotos(color ? fotosDe(p, color) : p.fotos);
 
   const chips = (label, values) => values.length
     ? el('div', {}, el('dt', { text: label }), el('dd', { class: 'chips' }, values.map((v) => el('span', { class: 'chip', text: v })))) : null;
   const colorRow = p.porColor
     ? el('div', {}, el('dt', { text: 'Colores' }), el('dd', { class: 'chips' }, colorButtons(p, 'chip', color, (c) => {
-      color = c; loadPhotos(fotosDe(p, c)); wa.href = waLink(p.nombre, c); precio.textContent = precioDe(p, c);
+      color = c; loadPhotos(fotosDe(p, c)); wa.href = waLink(p.nombre, c); pintarPrecio(precio, p, c);
     })))
     : chips('Colores', p.colores);
   const specs = el('dl', { class: 'info-specs' },
@@ -532,7 +556,7 @@ async function init() {
     const data = await loadData();
     state.products = data.products;
     state.categories = data.categories;
-    if (state.cat && !data.categories.some((c) => norm(c) === state.cat)) state.cat = null;
+  if (state.cat && (state.cat === SALE ? !data.products.some((p) => p.enSale) : !data.categories.some((c) => norm(c) === state.cat))) state.cat = null;
     renderBanner(data.banner);
     renderCategories();
     renderGrid();

@@ -9,6 +9,7 @@
   --muted: #6e6e6e;
   --line: #ebebeb;
   --accent: #efe4c7;
+  --sale: #d0021b;
   --ph: #f5f4f1;
   --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
   --body: "Inter", "Helvetica Neue", Arial, sans-serif;
@@ -79,6 +80,8 @@ h1, h2, h3, p, dl, dd { margin: 0; }
 }
 .cat:hover, .cat:active { background: var(--accent); color: var(--ink); }
 .cat[aria-pressed="true"] { background: var(--accent); color: var(--ink); font-weight: 600; }
+.cat.cat-sale { color: var(--sale); font-weight: 600; }
+.cat.cat-sale:hover, .cat.cat-sale:active, .cat.cat-sale[aria-pressed="true"] { background: var(--sale); color: #fff; }
 
 /* ---------- Banner ---------- */
 .banner { margin-top: clamp(16px, 3vw, 32px); position: relative; }
@@ -240,3 +243,6 @@ button.chip { cursor: pointer; transition: background .2s, border-color .2s; }
 /* ---------- Precio ---------- */
 .card-price { margin-top: 6px; font: 600 15px/1.2 var(--display); letter-spacing: .02em; }
 .info-price { margin-top: 14px; font: 500 clamp(20px, 2.2vw, 26px)/1.2 var(--display); letter-spacing: .02em; }
+.is-sale { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.price-old { color: var(--muted); font-weight: 400; font-size: .85em; text-decoration: line-through; }
+.price-new { color: var(--sale); }

@@ -79,6 +79,21 @@ Si una foto no aparece, casi siempre es porque no está compartida como "Cualqui
 - En prendas con una fila por color, cada color puede tener su propio precio; si solo lo pones en la primera fila, se usa para todos.
 - La columna debe estar en formato **Texto sin formato** (Formato → Número → Texto sin formato), sobre todo si mezclas números con textos como "Consultar".
 
+### Descuentos y pestaña Sale — columna `Precio con descuento`
+
+Agrega en la pestaña **Productos** una columna con el título exacto **Precio con descuento** (puede ir en cualquier posición).
+
+| Precio | Precio con descuento | Se ve en la página |
+|---|---|---|
+| `120000` | `89900` | ~~$ 120.000~~ **$ 89.900** (en rojo) |
+| `120000` | vacío | $ 120.000 (normal) |
+
+- Si un producto tiene descuento, aparece también en la pestaña **Sale** (en rojo) del menú de categorías.
+- La pestaña Sale aparece sola cuando hay al menos un producto con descuento, y desaparece cuando borras todos los descuentos.
+- Para quitar la oferta, borra la celda de Precio con descuento.
+- En prendas con una fila por color, cada color puede tener su propio descuento. Si solo pones precio y descuento en la primera fila, se usan para todos los colores.
+- Igual que Precio: formato **Texto sin formato**, solo el número.
+
 ### Publicar u ocultar un producto — columna `Publicar`
 
 La última columna de la pestaña se llama **Publicar**. Solo aparecen en el catálogo las filas que digan `ok`.
